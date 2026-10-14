@@ -31,7 +31,7 @@ namespace LiteMonitor.src.SystemServices
 
         private readonly Func<bool> _enabled;
         private readonly object _gate = new();
-        private readonly Timer _timer;
+        private readonly System.Threading.Timer _timer;
         private readonly bool _isThinkPad;
         private readonly Mutex? _ecMutex;
         private SafeFileHandle? _device;
@@ -62,7 +62,7 @@ namespace LiteMonitor.src.SystemServices
                     Debug.WriteLine("[ThinkPadFan] EC mutex unavailable: " + ex.Message);
                 }
             }
-            _timer = new Timer(Poll, null, SampleIntervalMs, SampleIntervalMs);
+            _timer = new System.Threading.Timer(Poll, null, SampleIntervalMs, SampleIntervalMs);
         }
 
         /// <summary>Zero RPM is valid (fan stopped), while 0xffff and out-of-range readings are not.</summary>

@@ -33,7 +33,9 @@ jobs:
           Invoke-WebRequest -Uri $source -OutFile $destination
           $f = Get-Item $destination
           if ($f.Length -ne 2612) { throw "Unexpected EC helper binary length: $($f.Length)" }
-          Write-Host "EC helper SHA256: $((Get-FileHash $destination -Algorithm SHA256).Hash)"
+          $hash = (Get-FileHash $destination -Algorithm SHA256).Hash
+          if ($hash -ne 'C38FD116E7AFF4D1FDB0A494E296BE0A6708E5A22FC72F14587442FB7F8F7906') { throw "EC helper integrity check failed: $hash" }
+          Write-Host "EC helper SHA256 verified: $hash"
       - name: Build LiteMonitor x64
         shell: pwsh
         run: dotnet publish LiteMonitor.csproj -c Release -r win-x64 --self-contained false -o publish -p:PublishSingleFile=false

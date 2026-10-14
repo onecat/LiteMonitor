@@ -80,6 +80,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="resources\assets\LpcACPIEC.bin" Condition="Exists('resources\assets\LpcACPIEC.bin')">
+      <TargetPath>LpcACPIEC.bin</TargetPath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
