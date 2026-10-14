@@ -52,6 +52,7 @@
 	
 <ItemGroup>
   <Compile Remove="LiteMonitor.Updater\**" />
+  <Compile Remove="tests\**" />
   <Compile Remove="LiteMonitor.Wpf\**" />
   <EmbeddedResource Remove="LiteMonitor.Updater\**" />
   <EmbeddedResource Remove="LiteMonitor.Wpf\**" />
@@ -76,5 +77,11 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="src\UI\Settings\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="resources\assets\LpcACPIEC.bin" Condition="Exists('resources\assets\LpcACPIEC.bin')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 </Project>
