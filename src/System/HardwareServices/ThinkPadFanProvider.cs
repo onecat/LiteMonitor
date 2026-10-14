@@ -114,12 +114,16 @@ namespace LiteMonitor.src.SystemServices
 
                     if (TryReadShared(out int fan1, out int fan2, out bool mappingPresent))
                     {
+                        // If TPFanCtrl2 started, its engine is now the sole EC
+                        // owner. Release any previously opened raw handle.
+                        CloseDevice();
                         Publish(fan1, fan2);
                         SetStatus("TPFanCtrl2 shared telemetry");
                         return;
                     }
                     if (mappingPresent)
                     {
+                        CloseDevice();
                         // Another process may still own the EC. Never open the
                         // raw EC backend while its IPC mapping exists, even if
                         // telemetry is stale/uninitialized.
@@ -215,7 +219,6 @@ namespace LiteMonitor.src.SystemServices
         {
             rpm = -1;
             if (_ecMutex == null) { SetStatus("EC mutex unavailable"); return false; }
-            if (!EnsureDevice()) return false;
 
             bool acquired = false;
             try
@@ -228,9 +231,14 @@ namespace LiteMonitor.src.SystemServices
                 // check. Detect that before any hardware access.
                 if (TryReadShared(out _, out _, out bool enginePresent) || enginePresent)
                 {
+                    CloseDevice();
                     SetStatus("TPFanCtrl2 started during EC acquisition");
                     return false;
                 }
+
+                // Never load the PawnIO module or probe the EC before the
+                // global EC lock and the second engine-presence check.
+                if (!EnsureDevice()) return false;
 
                 // Two complete samples, reject inconsistent reads rather
                 // than displaying garbage from a busy ACPI EC.
@@ -312,6 +320,10 @@ namespace LiteMonitor.src.SystemServices
                 if (_device.IsInvalid)
                 {
                     _device.Dispose();
+                    // PawnIO is normally a demand-start Windows kernel driver.
+                    // Only ask SCM to start an *already installed* driver;
+                    // never install/replace drivers from the RPM provider.
+                    Native.TryStartExistingPawnIoService();
                     _device = Native.CreateFile(@"\\.\PawnIO",
                         0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
                 }
@@ -375,6 +387,34 @@ namespace LiteMonitor.src.SystemServices
 
         private static class Native
         {
+            public static void TryStartExistingPawnIoService()
+            {
+                IntPtr manager = OpenSCManager(null, null, 0x0001); // CONNECT
+                if (manager == IntPtr.Zero) return;
+                try
+                {
+                    IntPtr service = OpenService(manager, "PawnIO", 0x0010); // START
+                    if (service == IntPtr.Zero) return;
+                    try { StartService(service, 0, IntPtr.Zero); }
+                    finally { CloseServiceHandle(service); }
+                }
+                finally { CloseServiceHandle(manager); }
+            }
+
+            [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "OpenSCManagerW", SetLastError = true)]
+            private static extern IntPtr OpenSCManager(string? machine, string? database, uint access);
+
+            [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "OpenServiceW", SetLastError = true)]
+            private static extern IntPtr OpenService(IntPtr scm, string name, uint access);
+
+            [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "StartServiceW", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool StartService(IntPtr service, uint argc, IntPtr argv);
+
+            [DllImport("advapi32.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool CloseServiceHandle(IntPtr handle);
+
             // Matches TPFanCtrl2's portaccess.cpp and PawnIO's pawnio_um.h.
             private const uint DeviceType = 41394;
             public const uint LoadBinary = (DeviceType << 16) | (0x821u << 2);
