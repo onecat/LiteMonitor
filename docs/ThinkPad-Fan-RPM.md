@@ -11,7 +11,7 @@ fallback without running another monitoring application.
 2. **No TPFanCtrl2 mapping:** on a positively identified Lenovo ThinkPad, try
    the PawnIO signed \`LpcACPIEC.bin\` module to read the first tachometer at
    EC offsets 0x84/0x85. This uses \`Global\Access_EC\` to coordinate with
-   software implementing the same named mutex and runs in a background timer.
+   software implementing the same named mutex (and the application's existing LibreHardwareMonitor scan lock) and runs in a background timer.
    The EC read command requires control-port communication at 0x66/0x62,
    but **never sends EC WRITE 0x81, fan-mode writes to 0x2F, or fan-selector
    writes to 0x31**. Dual-fan standalone reads intentionally remain unsupported.

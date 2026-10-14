@@ -96,7 +96,7 @@ namespace LiteMonitor.src.SystemServices
             _driverInstaller = new DriverInstaller(cfg, ReloadComputerSafe, ReleaseComputerForDriverInstall);
             _fpsCounter = new FpsCounter(_driverInstaller); // <--- 新增
             _thinkPadFan = new ThinkPadFanProvider(() =>
-                _cfg.IsAnyEnabled("CPU.Fan") || _cfg.IsAnyEnabled("CASE.Fan"));
+                _cfg.IsAnyEnabled("CPU.Fan") || _cfg.IsAnyEnabled("CASE.Fan"), _lock);
 
             // ★★★ [修改] 2. 将 Manager 注入给 ValueProvider ★★★
             _valueProvider = new HardwareValueProvider(

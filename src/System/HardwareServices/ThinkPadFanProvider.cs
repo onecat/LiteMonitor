@@ -30,6 +30,7 @@ namespace LiteMonitor.src.SystemServices
         private const ushort EcStatusPort = 0x66, EcDataPort = 0x62;
 
         private readonly Func<bool> _enabled;
+        private readonly object _hardwareSync; // share LHM scan lock
         private readonly object _gate = new();
         private readonly System.Threading.Timer _timer;
         private readonly bool _isThinkPad;
@@ -50,9 +51,10 @@ namespace LiteMonitor.src.SystemServices
 
         private static float? DecodePublished(int rpm) => rpm >= 0 ? rpm : null;
 
-        public ThinkPadFanProvider(Func<bool> enabled)
+        public ThinkPadFanProvider(Func<bool> enabled, object hardwareSync)
         {
             _enabled = enabled;
+            _hardwareSync = hardwareSync;
             _isThinkPad = DetectThinkPad();
             if (_isThinkPad)
             {
@@ -221,8 +223,13 @@ namespace LiteMonitor.src.SystemServices
             if (_ecMutex == null) { SetStatus("EC mutex unavailable"); return false; }
 
             bool acquired = false;
+            bool localScanLock = false;
             try
             {
+                // Never overlap LibreHardwareMonitor's own hardware scan;
+                // also honour the cross-process EC access mutex.
+                System.Threading.Monitor.TryEnter(_hardwareSync, 100, ref localScanLock);
+                if (!localScanLock) { SetStatus("LiteMonitor hardware scan busy"); return false; }
                 try { acquired = _ecMutex.WaitOne(100); }
                 catch (AbandonedMutexException) { acquired = true; }
                 if (!acquired) { SetStatus("EC busy"); return false; }
@@ -259,6 +266,7 @@ namespace LiteMonitor.src.SystemServices
             finally
             {
                 if (acquired) _ecMutex.ReleaseMutex();
+                if (localScanLock) System.Threading.Monitor.Exit(_hardwareSync);
             }
         }
 
