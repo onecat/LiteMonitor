@@ -29,6 +29,7 @@ namespace LiteMonitor.src.SystemServices
         private readonly FpsCounter _fpsCounter;
         private readonly DriverInstaller _driverInstaller;
         private readonly HardwareValueProvider _valueProvider;
+        private readonly ThinkPadFanProvider _thinkPadFan;
 
         // 性能计数器管理器
         private readonly PerformanceCounterManager _perfCounterManager;
@@ -94,6 +95,8 @@ namespace LiteMonitor.src.SystemServices
             _diskManager = new DiskManager();
             _driverInstaller = new DriverInstaller(cfg, ReloadComputerSafe, ReleaseComputerForDriverInstall);
             _fpsCounter = new FpsCounter(_driverInstaller); // <--- 新增
+            _thinkPadFan = new ThinkPadFanProvider(() =>
+                _cfg.IsAnyEnabled("CPU.Fan") || _cfg.IsAnyEnabled("CASE.Fan"), _lock);
 
             // ★★★ [修改] 2. 将 Manager 注入给 ValueProvider ★★★
             _valueProvider = new HardwareValueProvider(
@@ -105,7 +108,8 @@ namespace LiteMonitor.src.SystemServices
                 _fpsCounter, 
                 _perfCounterManager, 
                 _lock, 
-                _lastValidMap
+                _lastValidMap,
+                _thinkPadFan
             );
 
             // 3. 异步启动 (唯一优化：不卡UI)
@@ -290,6 +294,7 @@ namespace LiteMonitor.src.SystemServices
             }
 
             _valueProvider.Dispose();
+            _thinkPadFan.Dispose();
             _perfCounterManager.Dispose(); // ★★★ [新增] 释放计数器资源 ★★★
             _fpsCounter.Dispose(); // <--- 新增
             _networkManager.ClearCache();

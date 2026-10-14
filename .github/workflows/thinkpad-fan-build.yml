@@ -1,0 +1,46 @@
+name: ThinkPad fan RPM (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/thinkpad-fan-rpm]
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test RPM decoding and fallback semantics
+        shell: pwsh
+        run: dotnet run --project tests/ThinkPadFanTests/ThinkPadFanTests.csproj -c Release
+      - name: Stage pinned signed EC helper for standalone operation
+        shell: pwsh
+        run: |
+          $source = 'https://raw.githubusercontent.com/onecat/TPFanCtrl2/444693244c5f4ac60afd83ab0bdb97a2f5a6449b/fancontrol/pawnio/LpcACPIEC.bin'
+          $destination = 'resources/assets/LpcACPIEC.bin'
+          Invoke-WebRequest -Uri $source -OutFile $destination
+          $f = Get-Item $destination
+          if ($f.Length -ne 2612) { throw "Unexpected EC helper binary length: $($f.Length)" }
+          $hash = (Get-FileHash $destination -Algorithm SHA256).Hash
+          if ($hash -ne 'C38FD116E7AFF4D1FDB0A494E296BE0A6708E5A22FC72F14587442FB7F8F7906') { throw "EC helper integrity check failed: $hash" }
+          Write-Host "EC helper SHA256 verified: $hash"
+      - name: Build LiteMonitor x64
+        shell: pwsh
+        run: dotnet publish LiteMonitor.csproj -c Release -r win-x64 --self-contained false -o publish -p:PublishSingleFile=false
+      - name: Verify packaged ThinkPad module and executable
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'publish/LiteMonitor.exe')) { throw 'LiteMonitor.exe missing' }
+          if (!(Test-Path 'publish/LpcACPIEC.bin')) { throw 'PawnIO EC helper missing from output' }
+          if ((Get-Item 'publish/LpcACPIEC.bin').Length -ne 2612) { throw 'PawnIO EC helper size mismatch' }
+      - name: Upload Windows test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiteMonitor-ThinkPad-RPM-win-x64
+          path: publish/
+          if-no-files-found: error

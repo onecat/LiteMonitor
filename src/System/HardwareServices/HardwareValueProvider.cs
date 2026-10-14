@@ -22,6 +22,7 @@ namespace LiteMonitor.src.SystemServices
         // 子服务与处理器
         private readonly PerformanceCounterManager _perfManager;
         private readonly ComponentProcessor _componentProcessor;
+        private readonly ThinkPadFanProvider _thinkPadFan;
 
         // Tick 级智能缓存 (防止同帧重复计算)
         private readonly Dictionary<string, float> _tickCache = new();
@@ -41,7 +42,7 @@ namespace LiteMonitor.src.SystemServices
         private string _lastPrefNet = "";
         private string _lastPrefGpu = "";
         
-        public HardwareValueProvider(Computer c, Settings s, SensorMap map, NetworkManager net, DiskManager disk, FpsCounter fpsCounter,PerformanceCounterManager perfManager, object syncLock, Dictionary<string, float> lastValid)
+        public HardwareValueProvider(Computer c, Settings s, SensorMap map, NetworkManager net, DiskManager disk, FpsCounter fpsCounter,PerformanceCounterManager perfManager, object syncLock, Dictionary<string, float> lastValid, ThinkPadFanProvider thinkPadFan)
         {
             _computer = c;
             _cfg = s;
@@ -52,6 +53,7 @@ namespace LiteMonitor.src.SystemServices
             _perfManager = perfManager;
             _lock = syncLock;
             _lastValidMap = lastValid;
+            _thinkPadFan = thinkPadFan;
 
             // 初始化子服务
             _componentProcessor = new ComponentProcessor(c, s, map);
@@ -410,16 +412,16 @@ namespace LiteMonitor.src.SystemServices
                     case "CPU.Pump":
                     case "CASE.Fan":
                     case "GPU.Fan":
-                        if (_manualSensorCache.TryGetValue(key, out var sFan))
-                        {
+                        // Prefer the ThinkPad-specific tachometer for automatic
+                        // CPU/second-fan selection. Explicit user-configured
+                        // sensors and all non-ThinkPad machines retain LHM.
+                        if (key == "CPU.Fan" && string.IsNullOrEmpty(_cfg.PreferredCpuFan))
+                            result = _thinkPadFan.CpuRpm;
+                        else if (key == "CASE.Fan" && string.IsNullOrEmpty(_cfg.PreferredCaseFan))
+                            result = _thinkPadFan.SecondFanRpm;
+                        if (!result.HasValue && _manualSensorCache.TryGetValue(key, out var sFan))
                             result = sFan.Value;
-                        }
-                        else 
-                        {
-                            if (_manualSensorCache.TryGetValue(key, out var autoS) && autoS.Value.HasValue)
-                                result = autoS.Value.Value;
-                        }
-                        if (result.HasValue && result.Value < 10000f) 
+                        if (result.HasValue && result.Value < 10000f)
                             _cfg.UpdateMaxRecord(key, result.Value);
                         break;
 
