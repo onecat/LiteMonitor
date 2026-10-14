@@ -34,6 +34,9 @@ shared telemetry rather than accessing its EC directly.
 
 The native EC backend is opt-in via showing fan telemetry, checks BIOS
 manufacturer and product family, and samples at most every **3 seconds**.
+Like TPFanCtrl2, it tolerates ThinkPads that do not reliably assert the EC
+output-ready flag; invalid or inconsistent duplicate tachometer reads are
+rejected. CPU Fan sensor values are read using an independent background timer.
 It does not need a second resident process and does not issue fan control
 commands. Binary helper is taken from a pinned TPFanCtrl2 upstream commit for
 build packaging; it is not self-downloaded by the application at runtime.

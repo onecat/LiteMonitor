@@ -282,7 +282,11 @@ namespace LiteMonitor.src.SystemServices
             if (!WaitForStatus(mask: 0x02, expected: 0, 80)) return false;
             if (!WritePort(EcDataPort, address)) return false;
             if (!WaitForStatus(mask: 0x02, expected: 0, 80)) return false;
-            if (!WaitForStatus(mask: 0x01, expected: 1, 80)) return false;
+            // Some ThinkPads do not reliably set OBF for EC read responses.
+            // Mirror TPFanCtrl2's compatibility behavior: allow a brief
+            // output-ready window, then read without requiring OBF. Two
+            // consistent, valid tachometer samples are still mandatory.
+            WaitForStatus(mask: 0x01, expected: 1, 15);
             return ReadPort(EcDataPort, out data);
         }
 
@@ -324,8 +328,15 @@ namespace LiteMonitor.src.SystemServices
                     // Only ask SCM to start an *already installed* driver;
                     // never install/replace drivers from the RPM provider.
                     Native.TryStartExistingPawnIoService();
-                    _device = Native.CreateFile(@"\\.\PawnIO",
+                    // The driver may now expose the documented device path.
+                    _device = Native.CreateFile(@"\\.\GLOBALROOT\Device\PawnIO",
                         0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+                    if (_device.IsInvalid)
+                    {
+                        _device.Dispose();
+                        _device = Native.CreateFile(@"\\.\PawnIO",
+                            0xC0000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+                    }
                 }
                 if (_device.IsInvalid) { CloseDevice(); SetStatus("PawnIO driver unavailable (requires driver and access)"); return false; }
                 bool loaded = Native.DeviceIoControl(_device, Native.LoadBinary, module,

@@ -4,13 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [feature/thinkpad-fan-rpm]
-  pull_request:
-    paths:
-      - 'src/System/**'
-      - 'LiteMonitor.csproj'
-      - 'tests/**'
-      - '.github/workflows/thinkpad-fan-build.yml'
-
 permissions:
   contents: read
 
